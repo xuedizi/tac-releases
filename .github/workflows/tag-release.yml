@@ -1,0 +1,22 @@
+name: tag-release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yq
+        run: sudo snap install yq || (sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq)
+      - name: tag == VERSION == adapter.yaml version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER=$(cat VERSION)
+          AVER=$(yq '.version' adapter.yaml)
+          [ "$TAG" = "$VER" ] && [ "$VER" = "$AVER" ] || { echo "mismatch"; exit 1; }
+      - name: CHANGELOG entry exists
+        run: grep -q "^## v${GITHUB_REF_NAME#v}" CHANGELOG.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
