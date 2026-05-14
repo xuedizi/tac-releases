@@ -22,6 +22,8 @@ curl -fsSL https://github.com/xuedizi/tac-releases/releases/latest/download/inst
 
 会装到 `/usr/local/bin/tac`(需要 sudo)。装完会自动探测前置依赖 `apm` / `uv`,缺则打印官方一行安装命令(见 [§二 前置依赖](#二前置依赖))。
 
+> **Windows(Git Bash / MSYS)**:在 Git Bash 内执行同一条命令,默认装到 `$HOME/.local/bin/tac.exe`(即 `%USERPROFILE%\.local\bin\tac.exe`),**不走 sudo**;装完手动把该目录加入 PATH 即可 `tac --version`。
+
 ### 1.2 装到自定义目录(免 sudo)
 
 ```sh
@@ -51,7 +53,7 @@ curl -fsSL https://github.com/xuedizi/tac-releases/releases/latest/download/inst
 |---|---|
 | macOS | amd64, arm64 |
 | Linux | amd64, arm64 |
-| Windows | amd64(需 Git Bash / WSL 跑 install.sh,纯 PowerShell 暂不支持) |
+| Windows | amd64(在 Git Bash / WSL 内跑 install.sh,默认装到 `$HOME/.local/bin/tac.exe`;纯 PowerShell 暂不支持) |
 
 ### 1.6 验证
 
@@ -64,7 +66,7 @@ tac doctor --no-project
 
 ```
 [tac] tac v0.3.0 (commit <sha>, built <date>)
-[tac] platform: darwin/arm64
+[tac] platform: darwin/arm64                 # Linux: linux/amd64; Windows (Git Bash): windows/amd64
 [tac] apm: /opt/homebrew/bin/apm (apm 0.13.0) ✓
 [tac] uv: /opt/homebrew/bin/uv (uv 0.4.18) ✓
 [tac] git: /usr/bin/git (git 2.39.5) ✓
