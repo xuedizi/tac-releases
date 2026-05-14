@@ -1,0 +1,85 @@
+name: Smoke test release
+
+# Runs every time a tac release is published, on each supported runner.
+# Catches: dead URLs, broken install.sh, manifest/asset mismatch, sha256 mismatch,
+# `tac --version` failing, `tac doctor --no-project` failing.
+#
+# Manually re-runnable via workflow_dispatch — useful when re-uploading assets.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'release tag to test (e.g. v0.2.1), or "latest"'
+        required: true
+        default: 'latest'
+
+jobs:
+  install-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: pick version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >>"$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: install via install.sh
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -eux
+          mkdir -p "$HOME/.local/bin"
+          if [ "$VERSION" = "latest" ]; then
+            curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh \
+              | sh -s -- --prefix "$HOME/.local/bin"
+          else
+            curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh \
+              | sh -s -- --version "$VERSION" --prefix "$HOME/.local/bin"
+          fi
+          echo "$HOME/.local/bin" >>"$GITHUB_PATH"
+
+      - name: tac --version matches release tag
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -eux
+          out=$(tac --version)
+          echo "$out"
+          if [ "$VERSION" != "latest" ]; then
+            # output is like: "tac version v0.2.1 (commit ..., built ...)"
+            echo "$out" | grep -F "version $VERSION " >/dev/null \
+              || { echo "::error::tac --version does not contain expected tag $VERSION"; exit 1; }
+          fi
+
+      - name: tac doctor --no-project
+        run: |
+          set -eux
+          # apm + uv are NOT installed on the runner; doctor will report them as missing.
+          # We don't fail the job on a non-zero exit — we just want to verify the binary runs
+          # to the point of printing the doctor report.
+          tac doctor --no-project || true
+          # But the binary must at least start and print header — assert via a known string.
+          tac doctor --no-project 2>&1 | grep -q "tac version" \
+            || { echo "::error::doctor output missing 'tac version' header"; exit 1; }
+
+      - name: tac self-update --check (round-trip the new subcommand)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -eux
+          if tac self-update --help >/dev/null 2>&1; then
+            # only meaningful on releases that include self-update (v0.3.0+)
+            tac self-update --check
+          else
+            echo "::notice::self-update absent in $VERSION (pre-0.3 release) — skipping"
+          fi
